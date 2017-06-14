@@ -1,0 +1,33 @@
+*.class
+*.log
+*.swp
+*.db
+*.bak
+
+# sbt specific
+.cache/
+.history/
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+project/build.properties
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+# Sublime-Text
+Mimir.sublime-workspace
+
+#IDE
+.idea/
+
+# Plots
+*.png
+*.pdf
+*.svg
+/bin/
