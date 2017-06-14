@@ -19,7 +19,7 @@ $> sbt assembly
 and run the created fat scala-d3.jar
 
 
-##Adding Plots
+## Adding Plots
 
 add the plot Javascript file to the ./js directory and add a function to the D3.scala object to provided the data and generate the plot.  See the existing examples graph.js, bar_graph.js, ect.
 
