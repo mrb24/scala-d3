@@ -90,7 +90,7 @@ var data = d3.csvParse(csvdata, function(d, i, columns) {
   /*var svgOut = d3.select("svg").node().parentNode.innerHTML;
   Packages.edu.buffalo.odin.scalad3.D3.outputSVG(svgOut);
   
-  var htmlOut = d3.select("svg").node().parentNode.innerHTML;
+  var htmlOut = d3.select("html").node().parentNode.innerHTML;
   Packages.edu.buffalo.odin.scalad3.D3.outputHTML(htmlOut);
   
   var svgOut = d3.select("svg").node().parentNode.innerHTML;
