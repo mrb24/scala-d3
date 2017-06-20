@@ -2,6 +2,7 @@ define(function (require, exports, module) {
 var Event = require('./Event');
 var MouseEvent = require('./MouseEvent');
 var utils = require('./utils');
+var pathUtils = require('./pathUtils')
 
 module.exports = EventTarget;
 
@@ -292,7 +293,19 @@ EventTarget.prototype = {
 
   _getEventHandler: function _getEventHandler(type) {
     return (this._handlers && this._handlers[type]) || null;
-  }
+  },
+  
+  getPointAtLength: function(len) {
+       var pts = pathUtils(this.getAttribute('d'));
+       var t = Number(len);
+       var posarr = pts.at(t);
+       return {x:posarr[0], y:posarr[1]};
+    },
+    getTotalLength: function() {
+    	var pts = pathUtils(this.getAttribute('d'));
+    	return pts.length();
+    }
+
 
 };
 

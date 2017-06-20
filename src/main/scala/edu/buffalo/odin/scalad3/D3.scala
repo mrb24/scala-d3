@@ -1,6 +1,6 @@
 package edu.buffalo.odin.scalad3
 
-import java.io.{File, FileOutputStream, FileInputStream, FileNotFoundException, IOException, Reader, InputStreamReader}
+import java.io.{File, FileOutputStream, FileInputStream, StringReader, FileNotFoundException, IOException, Reader, InputStreamReader}
 
 import org.apache.commons.logging.{Log, LogFactory}
 import org.mozilla.javascript.{Context, Scriptable, ScriptableObject, Callable}
@@ -11,9 +11,22 @@ import com.google.common.base.Charsets;
 import java.nio.file.{Paths, Files, Path}
 import java.nio.charset.StandardCharsets
 
+import org.w3c.dom.svg.SVGDocument
+import org.apache.batik.anim.dom.SVGOMPathElement
+import org.apache.batik.anim.dom.SVGPathSupport
+import org.apache.batik.anim.dom.SAXSVGDocumentFactory
+import org.apache.batik.anim.dom.SVGDOMImplementation
+import org.apache.batik.util.XMLResourceDescriptor
 import org.apache.batik.transcoder.image.PNGTranscoder
 import org.apache.batik.transcoder.{TranscoderInput, TranscoderOutput}
 import org.apache.fop.svg.PDFTranscoder
+import org.apache.batik.bridge.UserAgent;
+import org.apache.batik.bridge.UserAgentAdapter;
+import org.apache.batik.bridge.DocumentLoader;
+import org.apache.batik.bridge.BridgeContext;
+import org.apache.batik.bridge.GVTBuilder;
+import org.apache.batik.gvt.GraphicsNode;
+   
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -37,7 +50,9 @@ object D3 {
        //dateLine(cx)
        //dateMultiLine(cx)
        //interactiveSunburst(cx)
-       biSankey(cx)
+       //biSankey(cx)
+       //xyLine(cx)
+       condegram(cx)
        
     } catch {
       case t: Throwable => t.printStackTrace() // TODO: handle error
@@ -115,11 +130,64 @@ PA,${(Math.random()*10000000).toInt},${(Math.random()*10000000).toInt},${(Math.r
       futTime = nowTime.plusDays(i)
       randVal = Math.random()
     }
-    println(datatsv)
+    //println(datatsv)
     scope.put("tsvdata", scope, datatsv);
     loadJS(cx, scope, "js/date_line.js")
   }
   
+  def xyLine(cx:Context) = {
+    val scope = getScope(cx);
+    var datatsv = "xval\tyval"
+    var randVal = Math.random()
+    var pow = 3.0
+    for(i <- 1 to 1200 by 8){ 
+      pow = 3.0 + (Math.random()/50.0)
+      if(randVal < 0.3 && randVal > 0.2)
+        randVal =  1.0 + (Math.random()/50.0)
+      else if(randVal > 0.9)
+        randVal =  1.0 - (Math.random()/60.0)
+      else if(randVal < 0.1)
+        randVal =  1.0 + (Math.random()/30.0)
+      else if(randVal < 0.2)
+        randVal = 1.0 - (Math.random()/20.0)
+      else
+        randVal = 1.0 + (Math.random()/20.0)
+      datatsv+=s"\n${i}\t${Math.pow((randVal*i.toDouble)/500.0,pow)}"
+      randVal = Math.random()
+    }
+    //println(datatsv)
+    scope.put("tsvdata", scope, datatsv);
+    scope.put("linecurve", scope, "curveStepAfter"); //'curveLinear','curveStepBefore','curveStepAfter','curveBasis','curveBasisOpen', 'curveBasisClosed', 'curveBundle','curveCardinal','curveCardinal','curveCardinalOpen','curveCardinalClosed','curveNatural'
+    scope.put("linecolor", scope, "#86bc29");
+    scope.put("yaxislabel", scope, "Y Label");
+    scope.put("xaxislabel", scope, "X Label");
+    loadJS(cx, scope, "js/xy_line.js")
+  }
+  
+  def condegram(cx:Context) = {
+    val sdf = DateTimeFormatter.ofPattern("MM-dd-yyyy")
+    val sdfm = DateTimeFormatter.ofPattern("M")
+    var nowTime = LocalDate.now();
+    var futTime = LocalDate.now();
+    val scope = getScope(cx);
+    val barCount = 364
+    var someData = "["
+    for (i <- 0 to barCount) {
+      if(i>0)
+        someData += ","
+      someData += s"""{
+        "date": "${futTime.format(sdf)}",
+        "value": ${Math.random()},
+        "group": ${futTime.format(sdfm)}
+      }"""
+      futTime = nowTime.plusDays(i)
+    }
+    someData += "]"
+    val nativeJsonObject= org.mozilla.javascript.NativeJSON.parse(cx,scope,someData,new NullCallable())
+    scope.put("barCount", scope, barCount);
+    scope.put("someData", scope, nativeJsonObject);
+    loadJS(cx, scope, "js/condegram.js")
+  }
   
   def interactiveSunburst(cx:Context) = {
     val scope = getScope(cx);
@@ -271,7 +339,7 @@ PA,${(Math.random()*10000000).toInt},${(Math.random()*10000000).toInt},${(Math.r
       futTime = nowTime.plusDays(i)
       randVal = Math.random()
     }
-    println(datatsv)
+    //println(datatsv)
     scope.put("tsvdata", scope, datatsv);
     loadJS(cx, scope, "js/date_multi_line.js")
   }
@@ -322,6 +390,44 @@ PA,${(Math.random()*10000000).toInt},${(Math.random()*10000000).toInt},${(Math.r
     pdf_ostream.close();
     val pdfFile = new File("pdf.pdf");
     java.awt.Desktop.getDesktop().browse(pdfFile.toURI());
+  }
+  
+  var currentSvgDoc : SVGDocument = null
+  var rootGN : GraphicsNode = null
+  var svgPath : SVGOMPathElement = null
+  def parseSvg(svg:String)  : SVGDocument = {
+    val userAgent = new UserAgentAdapter();
+    val loader = new DocumentLoader(userAgent);
+    val ctx = new BridgeContext(userAgent, loader);
+    ctx.setDynamicState(BridgeContext.DYNAMIC);
+    val builder = new GVTBuilder();
+    val reader = new StringReader(svg);
+    val uri = Paths.get("svg.svg").toUri().toURL().toString();
+    val parser = XMLResourceDescriptor.getXMLParserClassName();
+	  val f = new SAXSVGDocumentFactory(parser);
+	  val svgDoc = f.createSVGDocument(uri,reader);
+	  rootGN = builder.build(ctx, svgDoc);
+	  reader.close();
+    currentSvgDoc = svgDoc
+    svgPath = currentSvgDoc.getElementsByTagNameNS(SVGDOMImplementation.SVG_NAMESPACE_URI,"path").item(0).asInstanceOf[SVGOMPathElement]
+    svgDoc
+  }
+  
+  def getSVGPathTotalLength() : Float = {
+    //val path = currentSvgDoc.getElementsByTagNameNS(SVGDOMImplementation.SVG_NAMESPACE_URI,"path").item(0).asInstanceOf[SVGOMPathElement]
+    val length = svgPath.getTotalLength()
+    //val length = SVGPathSupport.getTotalLength(path)
+    length
+  }
+  
+  def getSVGPathPointAtLength(len:Float) : String = {
+    //val path = currentSvgDoc.getElementsByTagNameNS(SVGDOMImplementation.SVG_NAMESPACE_URI,"path").item(0).asInstanceOf[SVGOMPathElement]
+    //val point = SVGPathSupport.getPointAtLength(path, len)
+    //println("lenght------------->"+len)
+    val point = svgPath.getPointAtLength(len)
+    val ret = s"""{"x":${point.getX},"y":${point.getY}}"""
+    //println("point------------->"+ret)
+    ret
   }
   
   def createNewEnvironment() : ScriptableObject = {
