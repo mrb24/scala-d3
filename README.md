@@ -5,7 +5,7 @@ Basic setup of d3.js, the Data Driven Documents Javascript library, to run in a 
 
 ## Compiling scala-d3
 
-To compile from source, check out Mimir, and use one of the following to compile and run mimir.
+To compile from source, check out the code, and use one of the following to compile and run it.
 ```
 $> git clone https://github.com/mrb24/scala-d3.git
 ...
